@@ -1,17 +1,13 @@
-use core::num;
-use std::iter;
-use std::{process::Output, rc::Rc, string};
+use std::{iter, rc::Rc};
 
-use pom::utf8::seq;
-use pom::utf8::sym;
-use pom::utf8::*;
+use pom::utf8::{seq, *, sym};
 
 // todo switch from pom for better error messages
 
 #[derive(Debug, Clone)]
 pub struct Decleration {
-    public: bool,
-    value: DeclerationVal,
+    pub public: bool,
+    pub value: DeclerationVal,
 }
 
 #[derive(Debug, Clone)]
@@ -53,14 +49,14 @@ pub enum CaseExprs {
 
 #[derive(Debug, Clone)]
 pub struct EnumVariant {
-    name: String,
-    params: Vec<String>,
+    pub name: String,
+    pub params: Vec<String>,
 }
 
 pub type File = Vec<Decleration>;
 
 fn spaces<'a>() -> Parser<'a, ()> {
-    is_a(|a: char| a.is_whitespace()).repeat(0..).map(|a| ())
+    is_a(|a: char| a.is_whitespace()).repeat(0..).map(|_a| ())
 }
 
 fn token<'a>(token: &'a str) -> Parser<'a, ()> {
@@ -82,7 +78,7 @@ fn decleration<'a>() -> Parser<'a, Decleration> {
 
 fn value<'a>() -> Parser<'a, DeclerationVal> {
     // println!("in value");
-    (token("let") * variable_name() - token("=").expect("=")  + groupExpr())
+    (token("let") * variable_name() - token("=").expect("=")  + group_expr())
         .map(|(name, value)| DeclerationVal::Value(name, value))
 }
 
@@ -90,7 +86,7 @@ fn function<'a>() -> Parser<'a, DeclerationVal> {
     // println!("in function");
     (token("fun") * variable_name().expect("variable name")
         + (token("(") * sep_by1(variable_name, token(",")) - token(")"))
-        + groupExpr())
+        + group_expr())
     .map(|((name, args), expr)| DeclerationVal::Function(name, args, expr))
     .name("function")
 }
@@ -101,7 +97,7 @@ fn statement<'a>() -> Parser<'a, Statement> {
         | expr().map(Statement::Return)
 }
 
-fn groupExpr<'a>() -> Parser<'a, Expr> {
+fn group_expr<'a>() -> Parser<'a, Expr> {
     // println!("in assign function");
     (token("{")
         * (statement() - token(";"))
@@ -164,21 +160,21 @@ fn expr3<'a>() -> Parser<'a, Expr> {
         | variable_name().map(Expr::Variable)
         | array()
         | number()
-        | parseString()
-        | parseChar()
+        | parse_string()
+        | parse_char()
 }
 
-fn parseChar<'a>() -> Parser<'a, Expr> {
-    sym('\'') * charParser(true).map(Expr::Char) - sym('\'') - spaces()
+fn parse_char<'a>() -> Parser<'a, Expr> {
+    sym('\'') * char_parser(true).map(Expr::Char) - sym('\'') - spaces()
 }
 
-fn charParser<'a>(charLiteral: bool) -> Parser<'a, char> {
-    not_a(move |a| if charLiteral { a == '\'' } else { a == '"' }) // todo
+fn char_parser<'a>(char_literal: bool) -> Parser<'a, char> {
+    not_a(move |a| if char_literal { a == '\'' } else { a == '"' }) // todo
 }
 
-fn parseString<'a>() -> Parser<'a, Expr> {
+fn parse_string<'a>() -> Parser<'a, Expr> {
     sym('"')
-        * charParser(false)
+        * char_parser(false)
             .repeat(0..)
             .map(|a| Expr::StrLiteral(a.iter().collect()))
         - sym('"')
@@ -191,13 +187,13 @@ fn number<'a>() -> Parser<'a, Expr> {
         + (sym('.') * is_a(|a| a.is_digit(10)).repeat(1..)).opt())
     .map(|((neg, a), b)| match b {
         Some(b) => {
-            Expr::Float(if neg { -1.0 } else { 1.0 } * charsToNumber(a) as f64 + charsToDecimal(b))
+            Expr::Float(if neg { -1.0 } else { 1.0 } * chars_to_number(a) as f64 + chars_to_decimal(b))
         }
-        None => Expr::Number(if neg { -1 } else { 1 } * charsToNumber(a)),
+        None => Expr::Number(if neg { -1 } else { 1 } * chars_to_number(a)),
     }) - spaces()
 }
 
-fn charsToDecimal(b: Vec<char>) -> f64 {
+fn chars_to_decimal(b: Vec<char>) -> f64 {
     let mut decimal: f64 = 1.0;
     let mut acc: f64 = 0.0;
     for d in b.iter() {
@@ -214,7 +210,7 @@ fn charsToDecimal(b: Vec<char>) -> f64 {
     return acc;
 }
 
-fn charsToNumber(a: Vec<char>) -> i64 {
+fn chars_to_number(a: Vec<char>) -> i64 {
     let mut number: i64 = 0;
     for d in a.iter() {
         match d.to_digit(10) {
@@ -244,9 +240,9 @@ fn import<'a>() -> Parser<'a, DeclerationVal> {
     .name("import")
 }
 
-fn sep_by1<'a, b>(variable_name: fn() -> Parser<'a, b>, token: Parser<'a, ()>) -> Parser<'a, Vec<b>>
+fn sep_by1<'a, B>(variable_name: fn() -> Parser<'a, B>, token: Parser<'a, ()>) -> Parser<'a, Vec<B>>
 where
-    b: Clone + 'a,
+    B: Clone + 'a,
 {
     (call(variable_name) + (token * call(variable_name)).repeat(0..)).map(|(a, mut b)| {
         b.insert(0, a);
@@ -254,9 +250,9 @@ where
     })
 }
 
-fn sep_by<'a, b>(variable_name: fn() -> Parser<'a, b>, token: Parser<'a, ()>) -> Parser<'a, Vec<b>>
+fn sep_by<'a, B>(variable_name: fn() -> Parser<'a, B>, token: Parser<'a, ()>) -> Parser<'a, Vec<B>>
 where
-    b: Clone + 'a,
+    B: Clone + 'a,
 {
     sep_by1(variable_name, token).opt().map(|opt| opt.unwrap_or(vec![]))
 }

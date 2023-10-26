@@ -1,6 +1,7 @@
 use std::{io, fs};
 use mylanguage::parser::parser;
-use mylanguage::bytecodevm::*;
+use mylanguage::builtins;
+
 pub mod values;
 
 // use crate::bytecodevm::*;
@@ -18,9 +19,9 @@ fn main() -> io::Result<()> {
 
     let input = fs::read_to_string("testfiles/testFunc.txt")?;
 
-    let parserResult = parser().parse(input.as_bytes());
+    let parser_result = parser().parse(input.as_bytes());
 
-    print!("{:#?}",parserResult);
+    print!("{:#?}",parser_result);
 
 
     Ok(())
