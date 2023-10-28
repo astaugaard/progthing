@@ -1,18 +1,20 @@
 use std::{arch::x86_64::_mm256_movemask_pd, collections::HashMap};
 
 use crate::{
-    bytecodevm::VmState,
+    bytecodevm::{VmState, OpCode},
     values::{BuiltinFunc, Value},
 };
 
 pub enum BuiltinValue<'a> {
     Constant(Value),
     Builtin(BuiltinFunc<'a>),
+    Operator(OpCode)
 }
 
 pub enum BuiltinId {
     Constant(usize),
     Builtin(usize),
+    Operator(OpCode)
 }
 
 pub struct BuiltinMaps<'a> {
@@ -41,6 +43,9 @@ fn generate_builtin_map<'a>(values: Vec<(&'a str, BuiltinValue<'a>)>) -> Builtin
                 builtin_table.push(func);
                 builtin_name_table.push(k.clone())
             }
+            BuiltinValue::Operator(op) => {
+                name_id_map.insert(k.clone(),BuiltinId::Operator(op));
+            }
         }
     }
     BuiltinMaps {
@@ -52,13 +57,18 @@ fn generate_builtin_map<'a>(values: Vec<(&'a str, BuiltinValue<'a>)>) -> Builtin
     }
 }
 
+fn boperator<'a>(name: &'a str, opcode: OpCode) -> (&'a str, BuiltinValue<'static>) {
+    (name,BuiltinValue::Operator(opcode))
+}
+
 pub fn default_builtin_map() -> BuiltinMaps<'static> {
     generate_builtin_map(vec![(
         "dbg",
         BuiltinValue::Builtin(BuiltinFunc {
             function: Box::new(|vmstate: &mut VmState| print!("{:#?}", vmstate.pop_value())),
         }),
-    )])
+    ),
+    boperator("+",OpCode::Add)])
 }
 
 
